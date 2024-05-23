@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let file = open_file(path)?;
         let buffer = BufReader::new(file);
 
-        chaves = buffer
+        buffer
             .split(NEWLINE_BYTE)
             .flatten()
             .enumerate()
@@ -30,17 +30,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(split_line)
             .filter(|campos| campos.len() >= 2)
             .take_while(|campos| campos[0] != "9999")
-            .flat_map(|campos| {
-                let mut chaves: Vec<String> = Vec::new();
+            .for_each(|campos| {
                 for campo in campos {
                     for cap in REGEX_CHAVE44.captures_iter(&campo) {
                         let chave = cap[0].to_string();
-                        chaves.push(chave);
+                        chaves.insert(chave);
                     }
                 }
-                chaves
-            })
-            .collect();
+            });
     }
 
     println!("{} chaves: {chaves:#?}", chaves.len());
