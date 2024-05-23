@@ -1,9 +1,8 @@
-use extrair_chaves_de_44_digitos::{Arguments, *};
+use extrair_chaves_de_44_digitos::{Arguments, get_efd_entries, get_map};
 
-use claudiofsr_lib::{open_file, BytesExtension, StrExtension};
+use rayon::prelude::*;
 use std::{
     collections::BTreeSet,
-    io::{BufRead, BufReader},
     time::Instant,
 };
 
@@ -21,33 +20,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arguments = Arguments::build()?;
     let efd_entries = get_efd_entries(&arguments)?;
 
-    let mut chaves: BTreeSet<String> = BTreeSet::new();
-
-    // Processa os arquivos que foram coletados
-    for entry in efd_entries {
-        let path = entry.path();
-        let file = open_file(path)?;
-        let buffer = BufReader::new(file);
-
-        buffer
-            .split(NEWLINE_BYTE)
-            .flatten()
-            .enumerate()
-            .map(|(line_number, vec_bytes)| {
-                get_string_utf8(vec_bytes.trim(), line_number + 1, path)
-            })
-            .map(split_line)
-            .filter(|campos| campos.len() >= 2)
-            .take_while(|campos| campos[0] != "9999")
-            .for_each(|campos| {
-                for campo in campos {
-                    for cap in REGEX_CHAVE44.captures_iter(&campo) {
-                        let chave = cap[0].remove_non_digits();
-                        chaves.insert(chave);
-                    }
-                }
-            });
-    }
+    // Processar arquivos coletados em paralelo
+    // Utilizar o procedimento Map Reduce
+    let chaves: BTreeSet<String> = efd_entries
+        .par_iter() // rayon: parallel iterator
+        .map(|entry| {
+            // Processar arquivo individualmente
+            let map: BTreeSet<String> = get_map(entry).unwrap_or_default();
+            map            
+        })
+        .reduce(BTreeSet::new, |mut map_a, map_b| {
+            map_a.extend(map_b);
+            map_a
+        });
 
     println!("{} chaves: {chaves:#?}", chaves.len());
 

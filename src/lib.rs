@@ -2,15 +2,15 @@ mod args;
 
 pub use self::args::*;
 
+use claudiofsr_lib::{open_file, BytesExtension, StrExtension};
 use encoding_rs::WINDOWS_1252;
 use encoding_rs_io::DecodeReaderBytesBuilder;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::{
-    io::Read,
-    ops::Deref,
-    path::{Path, PathBuf},
-    str,
+    collections::BTreeSet, 
+    io::{BufRead, BufReader, Read}, 
+    ops::Deref, path::{Path, PathBuf}, str
 };
 use walkdir::{DirEntry, WalkDir};
 
@@ -22,16 +22,6 @@ pub static REGEX_CHAVE44: Lazy<Regex> = Lazy::new(|| {
         (\b|\D)\d{44}(\b|\D)
     ").unwrap()
 });
-
-/// Get path from arguments or from default (current directory).
-pub fn get_path(opt_path: &Option<PathBuf>) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let relative_path: PathBuf = match opt_path {
-        Some(path) => path.to_owned(),
-        None => PathBuf::from("."),
-    };
-
-    Ok(relative_path)
-}
 
 pub fn get_efd_entries(arguments: &Arguments) -> Result<Vec<DirEntry>, Box<dyn std::error::Error>> {
     let dir_path = get_path(&arguments.path)?;
@@ -61,6 +51,45 @@ pub fn get_efd_entries(arguments: &Arguments) -> Result<Vec<DirEntry>, Box<dyn s
         .collect();
 
     Ok(entries)
+}
+
+/// Get path from arguments or from default (current directory).
+pub fn get_path(opt_path: &Option<PathBuf>) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let relative_path: PathBuf = match opt_path {
+        Some(path) => path.to_owned(),
+        None => PathBuf::from("."),
+    };
+
+    Ok(relative_path)
+}
+
+pub fn get_map(entry: &DirEntry) -> Result<BTreeSet<String>, Box<dyn std::error::Error>> {
+    let path = entry.path();
+    let file = open_file(path)?;
+    let buffer = BufReader::new(file);
+
+    let mut chaves: BTreeSet<String> = BTreeSet::new();
+
+    buffer
+        .split(NEWLINE_BYTE)
+        .flatten()
+        .enumerate()
+        .map(|(line_number, vec_bytes)| {
+            get_string_utf8(vec_bytes.trim(), line_number + 1, path)
+        })
+        .map(split_line)
+        .filter(|campos| campos.len() >= 2)
+        .take_while(|campos| campos[0] != "9999")
+        .for_each(|campos| {
+            for campo in campos {
+                for cap in REGEX_CHAVE44.captures_iter(&campo) {
+                    let chave = cap[0].remove_non_digits();
+                    chaves.insert(chave);
+                }
+            }
+        });
+
+    Ok(chaves)
 }
 
 /// Converts a slice of bytes to a String.
