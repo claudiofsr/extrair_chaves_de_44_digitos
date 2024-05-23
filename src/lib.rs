@@ -2,38 +2,31 @@ mod args;
 
 pub use self::args::*;
 
+use encoding_rs::WINDOWS_1252;
+use encoding_rs_io::DecodeReaderBytesBuilder;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::{
-    io::Read, 
-    ops::Deref, 
-    path::{Path, PathBuf}, 
+    io::Read,
+    ops::Deref,
+    path::{Path, PathBuf},
     str,
 };
 use walkdir::{DirEntry, WalkDir};
-use encoding_rs::WINDOWS_1252;
-use encoding_rs_io::DecodeReaderBytesBuilder;
 
 pub const NEWLINE_BYTE: u8 = b'\n';
 pub const DELIMITER_CHAR: char = '|';
 
-pub static REGEX_CHAVE44: Lazy<Regex> = Lazy::new(||
+pub static REGEX_CHAVE44: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?ix)
         (\b|\D)\d{44}(\b|\D)
     ").unwrap()
-);
+});
 
 /// Get path from arguments or from default (current directory).
 pub fn get_path(opt_path: &Option<PathBuf>) -> Result<PathBuf, Box<dyn std::error::Error>> {
     let relative_path: PathBuf = match opt_path {
-        Some(path) => {
-            if std::path::Path::new(&path).try_exists()? {
-                path.to_path_buf()
-            } else {
-                eprintln!("The path {path:?} was not found!");
-                panic!("fn get_path()");
-            }
-        }
+        Some(path) => path.to_owned(),
         None => PathBuf::from("."),
     };
 
@@ -51,18 +44,20 @@ pub fn get_efd_entries(arguments: &Arguments) -> Result<Vec<DirEntry>, Box<dyn s
     let entries: Vec<DirEntry> = WalkDir::new(dir_path)
         .max_depth(max_depth)
         .into_iter()
-        .flatten()
+        .flatten() // Result<DirEntry, Error> to DirEntry
         .filter(|entry| entry.file_type().is_file())
-        .filter(|entry|
-            entry.path().extension().is_some_and(|ext|
-                ext.eq_ignore_ascii_case("txt")
-            )
-        )
-        .filter(|entry|
-            entry.path().file_name().is_some_and(|os_str| 
-                os_str.to_str().is_some_and(|f| f.to_uppercase().starts_with("PISCOFINS"))
-            )
-        )
+        .filter(|entry| {
+            entry
+                .path()
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("txt"))
+        })
+        .filter(|entry| {
+            entry
+                .file_name()
+                .to_str()
+                .is_some_and(|s| s.to_uppercase().starts_with("PISCOFINS"))
+        })
         .collect();
 
     Ok(entries)
@@ -104,7 +99,7 @@ where
 /**
 Split the Line using the dilimiter
 ```
-    use efd_contribuicoes::split_line;
+    use extrair_chaves_de_44_digitos::split_line;
     let line = " | campo1| campo2 | ...... |campoN | ";
     let campos = split_line(line);
     // As a result, we will have:

@@ -1,7 +1,18 @@
 [package]
 name = "extrair_chaves_de_44_digitos"
+authors = ["Claudio F S Rodrigues <claudiofsrodrigues@gmail.com>"]
 version = "0.1.0"
 edition = "2021"
+description = "Extrair chaves de 44 dígitos de arquivos SPED EFD"
+license = "BSD-3-Clause"
+readme = "README.md"
+categories = ["command-line-utilities"]
+keywords = [
+    "SPED EFD",
+    "extract",
+    "regex",
+    "digits",
+]
 
 [dependencies]
 anstyle = "1.0" # used by clap color

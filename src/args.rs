@@ -1,33 +1,22 @@
 use clap::Parser;
-use std::path::PathBuf;
+use std::{fs, path::PathBuf, process};
 
 // https://stackoverflow.com/questions/74068168/clap-rs-not-printing-colors-during-help
 fn get_styles() -> clap::builder::Styles {
-
-    let cyan   = anstyle::Color::Ansi(anstyle::AnsiColor::Cyan);
-    let green  = anstyle::Color::Ansi(anstyle::AnsiColor::Green);
+    let cyan = anstyle::Color::Ansi(anstyle::AnsiColor::Cyan);
+    let green = anstyle::Color::Ansi(anstyle::AnsiColor::Green);
     let yellow = anstyle::Color::Ansi(anstyle::AnsiColor::Yellow);
 
     clap::builder::Styles::styled()
-        .placeholder(
-            anstyle::Style::new()
-                .fg_color(Some(yellow))
-        )
-        .usage(
-            anstyle::Style::new()
-                .fg_color(Some(cyan))
-                .bold()
-        )
+        .placeholder(anstyle::Style::new().fg_color(Some(yellow)))
+        .usage(anstyle::Style::new().fg_color(Some(cyan)).bold())
         .header(
             anstyle::Style::new()
                 .fg_color(Some(cyan))
                 .bold()
-                .underline()
+                .underline(),
         )
-        .literal(
-            anstyle::Style::new()
-                .fg_color(Some(green))
-        )
+        .literal(anstyle::Style::new().fg_color(Some(green)))
 }
 
 // https://docs.rs/clap/latest/clap/struct.Command.html#method.help_template
@@ -73,6 +62,38 @@ impl Arguments {
     /// Build Arguments struct
     pub fn build() -> Result<Arguments, Box<dyn std::error::Error>> {
         let args: Arguments = Arguments::parse();
+        args.validate_dir_path()?;
         Ok(args)
+    }
+
+    /// Validate directory paths
+    fn validate_dir_path(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let paths = [&self.path];
+
+        for dir_path in paths.into_iter().flatten() {
+            if !std::path::Path::new(&dir_path).try_exists()? {
+                eprintln!("fn validate_dir_path()");
+                eprintln!("The path {dir_path:?} was not found!");
+                process::exit(1);
+            };
+
+            if !dir_path.is_dir() {
+                eprintln!("fn validate_dir_path()");
+                eprintln!("{dir_path:?} is not a directory!");
+                process::exit(1);
+            }
+
+            // Check if able to write inside directory
+            let metadada = fs::metadata(dir_path)?;
+
+            if metadada.permissions().readonly() {
+                eprintln!("fn validate_dir_path()");
+                eprintln!("No write permission");
+                eprintln!("{dir_path:?} is readonly!");
+                process::exit(1);
+            }
+        }
+
+        Ok(())
     }
 }

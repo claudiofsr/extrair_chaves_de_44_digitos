@@ -1,11 +1,20 @@
-use extrair_chaves_de_44_digitos::{*, Arguments};
+use extrair_chaves_de_44_digitos::{Arguments, *};
 
-use claudiofsr_lib::{BytesExtension, StrExtension, open_file};
+use claudiofsr_lib::{open_file, BytesExtension, StrExtension};
 use std::{
-    collections::BTreeSet, 
-    io::{BufRead, BufReader}, 
-    time::Instant
+    collections::BTreeSet,
+    io::{BufRead, BufReader},
+    time::Instant,
 };
+
+/**
+    cargo fmt
+    cargo clippy
+    clear && cargo test -- --show-output
+    clear && cargo run -- -h
+    cargo doc --open
+    cargo b -r && cargo install --path=.
+*/
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let time = Instant::now();
