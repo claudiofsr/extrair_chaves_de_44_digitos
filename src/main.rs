@@ -1,6 +1,6 @@
 use extrair_chaves_de_44_digitos::{*, Arguments};
 
-use claudiofsr_lib::{BytesExtension, open_file};
+use claudiofsr_lib::{BytesExtension, StrExtension, open_file};
 use std::{
     collections::BTreeSet, 
     io::{BufRead, BufReader}, 
@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .for_each(|campos| {
                 for campo in campos {
                     for cap in REGEX_CHAVE44.captures_iter(&campo) {
-                        let chave = cap[0].to_string();
+                        let chave = cap[0].remove_non_digits();
                         chaves.insert(chave);
                     }
                 }
