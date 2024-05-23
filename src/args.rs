@@ -44,8 +44,8 @@ pub struct Arguments {
     #[arg(short('m'), long("max_depth"), required = false)]
     pub max_depth: Option<usize>,
 
-    /// Set the xml file path, otherwise recursively search
-    /// for xml files in the current directory
+    /// Set the SPED EFD txt file path, otherwise recursively search
+    /// for txt files in the current directory
     #[arg(short('p'), long("path"), required = false)]
     pub path: Option<PathBuf>,
 
