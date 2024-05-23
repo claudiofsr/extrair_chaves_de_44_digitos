@@ -23,10 +23,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Processar em paralelo arquivos coletados
     let chaves: BTreeSet<String> = efd_entries
         .par_iter() // rayon: parallel iterator
-        .flat_map(|entry|
-            // Processar arquivo individualmente
-            get_map(entry).unwrap_or_default()
-        ) 
+        .flat_map(get_map) // Processar arquivo individualmente
+        .flatten()
         .collect(); // Collect into a BTreeSet
 
     println!("{} chaves: {chaves:#?}", chaves.len());
