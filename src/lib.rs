@@ -80,7 +80,7 @@ where
     // from_utf8() checks to ensure that the bytes are valid UTF-8
     match str::from_utf8(slice_bytes) {
         Ok(str) => str.to_string(),
-        Err(_) => {
+        Err(error1) => {
             let mut data = DecodeReaderBytesBuilder::new()
                 .encoding(Some(WINDOWS_1252))
                 .build(slice_bytes);
@@ -91,9 +91,8 @@ where
                 eprintln!("Line nº {line_number}");
                 eprintln!("Used encoding type: WINDOWS_1252.");
                 eprintln!("Try another encoding type!");
-                panic!(
-                    "Failed to convert data from WINDOWS_1252 to UTF-8!\nError: {error2}\n",
-                );
+                eprintln!("Failed to convert data from WINDOWS_1252 to UTF-8!");
+                panic!("Error: {error1}\n{error2}\n");
             }
             buffer
         }
