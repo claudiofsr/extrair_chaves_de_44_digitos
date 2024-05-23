@@ -20,18 +20,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arguments = Arguments::build()?;
     let efd_entries = get_efd_entries(&arguments)?;
 
-    // Processar arquivos coletados em paralelo
-    // Utilizar o procedimento Map Reduce
+    // Processar em paralelo arquivos coletados
     let chaves: BTreeSet<String> = efd_entries
         .par_iter() // rayon: parallel iterator
-        .map(|entry| {
+        .flat_map(|entry|
             // Processar arquivo individualmente
-            get_map(entry).unwrap_or_default()           
-        })
-        .reduce(BTreeSet::new, |mut map_a, map_b| {
-            map_a.extend(map_b);
-            map_a
-        });
+            get_map(entry).unwrap_or_default()
+        ) 
+        .collect(); // Collect into a BTreeSet
 
     println!("{} chaves: {chaves:#?}", chaves.len());
 
