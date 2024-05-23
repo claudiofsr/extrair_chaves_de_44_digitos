@@ -26,8 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .par_iter() // rayon: parallel iterator
         .map(|entry| {
             // Processar arquivo individualmente
-            let map: BTreeSet<String> = get_map(entry).unwrap_or_default();
-            map            
+            get_map(entry).unwrap_or_default()           
         })
         .reduce(BTreeSet::new, |mut map_a, map_b| {
             map_a.extend(map_b);
