@@ -5,7 +5,6 @@ pub use self::args::*;
 use claudiofsr_lib::{open_file, BytesExtension, StrExtension};
 use encoding_rs::WINDOWS_1252;
 use encoding_rs_io::DecodeReaderBytesBuilder;
-use once_cell::sync::Lazy;
 use regex::Regex;
 use std::{
     collections::BTreeSet,
@@ -13,13 +12,14 @@ use std::{
     ops::Deref,
     path::{Path, PathBuf},
     str,
+    sync::LazyLock,
 };
 use walkdir::{DirEntry, WalkDir};
 
 pub const NEWLINE_BYTE: u8 = b'\n';
 pub const DELIMITER_CHAR: char = '|';
 
-pub static REGEX_CHAVE44: Lazy<Regex> = Lazy::new(|| {
+pub static REGEX_CHAVE44: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?ix)
         (\b|\D)\d{44}(\b|\D)
