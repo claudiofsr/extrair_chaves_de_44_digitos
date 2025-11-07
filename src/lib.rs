@@ -119,9 +119,9 @@ pub fn process_all_efd_files_parallel(efd_entries: &[DirEntry]) -> MyResult<BTre
     let all_file_keys: BTreeSet<String> = efd_entries
         .into_par_iter()
         // 2. Map each DirEntry to its extracted keys:
-        //    Calls `get_map` for each DirEntry, returning a `MyResult<BTreeSet<String>>`.
-        //    `get_map` itself handles file I/O, decoding, and key extraction for a single file.
-        .map(get_map)
+        //    Calls `extract_keys_from_efd_file` for each DirEntry, returning a `MyResult<BTreeSet<String>>`.
+        //    `extract_keys_from_efd_file` itself handles file I/O, decoding, and key extraction for a single file.
+        .map(extract_keys_from_efd_file)
         // 3. Collect results, handling errors:
         //    This `collect` method on an iterator of `Result<T, E>` will:
         //    - If all items are `Ok`, collect all `BTreeSet<String>` into a `Vec<BTreeSet<String>>`.
@@ -211,7 +211,7 @@ fn process_line_for_keys(
 /// A `MyResult` containing a `BTreeSet<String>` of unique 44-digit keys
 /// found in the file. Returns `Err(MyError)` if file operations, decoding,
 /// or other unexpected issues occur.
-pub fn get_map_funcional(entry: &DirEntry) -> MyResult<BTreeSet<String>> {
+pub fn extract_keys_from_efd_file_funcional(entry: &DirEntry) -> MyResult<BTreeSet<String>> {
     let path = entry.path();
     let file = open_file(path)?; // Propaga qualquer erro ao abrir o arquivo
     let buffer = BufReader::new(file);
@@ -259,47 +259,72 @@ pub fn get_map_funcional(entry: &DirEntry) -> MyResult<BTreeSet<String>> {
     }
 }
 
-pub fn get_map(entry: &DirEntry) -> MyResult<BTreeSet<String>> {
-    let path = entry.path();
-    let file = open_file(path)?; // Propaga qualquer erro ao abrir o arquivo
-    let buffer = BufReader::new(file);
+/// Processes a directory entry (file) to extract unique 44-digit keys.
+///
+/// This function reads the content of a file specified by `entry` line by line,
+/// decodes each line, splits it into fields. It collects unique 44-digit keys
+/// found within these fields.
+///
+/// The processing stops upon encountering a line where the first field is "9999`,
+/// treating this as a successful end-of-file marker. Real I/O or decoding errors
+/// will propagate as `MyError`.
+///
+/// # Arguments
+/// * `entry` - A reference to a `DirEntry` representing the file to process.
+///
+/// # Returns
+/// A `MyResult` containing a `BTreeSet<String>` of unique 44-digit keys
+/// found in the file. Returns `Err(MyError)` if file operations, decoding,
+/// or other unexpected issues occur.
+pub fn extract_keys_from_efd_file(entry: &DirEntry) -> MyResult<BTreeSet<String>> {
+    let path = entry.path(); // Get the file path from the directory entry
+    let file = open_file(path)?; // Open the file, propagating any I/O errors immediately
+    let buffer = BufReader::new(file); // Create a buffered reader for efficient line-by-line processing
 
-    let mut collected_keys: BTreeSet<String> = BTreeSet::new();
+    let mut collected_keys: BTreeSet<String> = BTreeSet::new(); // Initialize a set to store unique keys
 
-    // Iterar sobre as linhas, tratando erros e o marcador de fim.
+    // Iterate over each line of the file, splitting by the NEWLINE_BYTE.
+    // `enumerate()` provides a 0-based index for each line.
     for (line_idx, byte_result) in buffer.split(NEWLINE_BYTE).enumerate() {
-        let line_number = line_idx + 1; // Número da linha (1-based)
+        let line_number = line_idx + 1; // Convert 0-based index to 1-based line number
 
+        // Extract raw bytes of the line. The `?` operator propagates `io::Error`
+        // from `byte_result` if reading the line fails.
         let line_bytes: Vec<u8> = byte_result?;
 
-        // Tenta processar a linha.
-        // O `process_line_for_keys` já lida com "9999" e linhas para ignorar.
+        // Attempt to process the current line for 44-digit keys.
+        // `process_line_for_keys` is responsible for decoding, splitting,
+        // and identifying keys, as well as detecting the "9999" end-marker.
         match process_line_for_keys(line_bytes, line_number, &path.to_path_buf()) {
             Ok(Some(keys)) => {
-                // Se encontrou chaves, insere-as no conjunto.
+                // If the line was successfully processed and contained keys,
+                // insert each key into our `collected_keys` set.
                 for key in keys {
                     collected_keys.insert(key);
                 }
             }
             Ok(None) => {
-                // Linha ignorada, continua para a próxima.
+                // If the line was valid but should be ignored (e.g., too few fields),
+                // simply continue to the next line without collecting any keys.
                 continue;
             }
             Err(MyError::EofMarkerReached(..)) => {
-                // Marcador "9999" encontrado.
-                // Como isso é considerado um "sucesso" para o processamento do arquivo,
-                // simplesmente retornamos as chaves coletadas até agora.
+                // The "9999" end-of-file marker was found.
+                // This is treated as a controlled, successful termination for the file.
+                // Return all keys collected up to this point.
                 return Ok(collected_keys);
             }
             Err(e) => {
-                // Outro erro real, propaga-o.
+                // Any other actual error (e.g., encoding issues) occurred during line processing.
+                // Propagate this error immediately, halting further processing of this file.
                 return Err(e);
             }
         }
     }
 
-    // Se o loop terminar sem encontrar "9999" ou outro erro,
-    // significa que o arquivo foi processado até o fim.
+    // If the loop completes without encountering the "9999" marker or any errors,
+    // it means the entire file was processed to its end.
+    // Return all keys collected from the file.
     Ok(collected_keys)
 }
 
@@ -404,7 +429,7 @@ mod lib_tests {
 
     /// cargo test -- --show-output basic
     #[test]
-    fn test_get_map_basic_extraction() -> MyResult<()> {
+    fn test_extract_keys_from_efd_file_basic_extraction() -> MyResult<()> {
         let temp_dir = tempdir()?;
         let file_content = r"
 |FIELD1|12345678901234567890123456789012345678901234|FIELD2|
@@ -424,7 +449,7 @@ mod lib_tests {
         );
         // --- End of added code ---
 
-        let result = get_map(&entry)?;
+        let result = extract_keys_from_efd_file(&entry)?;
 
         println!("result: {result:#?}");
 
@@ -440,7 +465,7 @@ mod lib_tests {
     }
 
     #[test]
-    fn test_get_map_with_no_keys() -> MyResult<()> {
+    fn test_extract_keys_from_efd_file_with_no_keys() -> MyResult<()> {
         let temp_dir = tempdir()?;
         let file_content = r"
 |FIELD1|SOME TEXT|FIELD2|
@@ -448,14 +473,14 @@ mod lib_tests {
         ";
         let entry = create_dummy_direntry(&temp_dir, "PISCOFINS_NOKEYS.txt", file_content)?;
 
-        let result = get_map(&entry)?;
+        let result = extract_keys_from_efd_file(&entry)?;
         assert!(result.is_empty());
         Ok(())
     }
 
     /// cargo test -- --show-output basic
     #[test]
-    fn test_get_map_with_duplicate_keys() -> MyResult<()> {
+    fn test_extract_keys_from_efd_file_with_duplicate_keys() -> MyResult<()> {
         let temp_dir = tempdir()?;
         let file_content = r"
 
@@ -465,7 +490,7 @@ mod lib_tests {
         ";
         let entry = create_dummy_direntry(&temp_dir, "PISCOFINS_DUPLICATES.txt", file_content)?;
 
-        let result = get_map(&entry)?;
+        let result = extract_keys_from_efd_file(&entry)?;
 
         let expected_keys: BTreeSet<String> = [
             "11111111111111111111111111111111111111111111".to_string(),
@@ -481,7 +506,7 @@ mod lib_tests {
 
     /// cargo test -- --show-output 9999
     #[test]
-    fn test_get_map_stops_at_9999() -> MyResult<()> {
+    fn test_extract_keys_from_efd_file_stops_at_9999() -> MyResult<()> {
         let temp_dir = tempdir()?;
         let file_content = r"
 |FIELD1|11111111111111111111111111111111111111111111|
@@ -490,7 +515,7 @@ mod lib_tests {
         ";
         let entry = create_dummy_direntry(&temp_dir, "PISCOFINS_9999.txt", file_content)?;
 
-        let result = get_map(&entry)?;
+        let result = extract_keys_from_efd_file(&entry)?;
 
         println!("result: {result:#?}");
 
@@ -507,18 +532,18 @@ mod lib_tests {
     }
 
     #[test]
-    fn test_get_map_empty_file() -> MyResult<()> {
+    fn test_extract_keys_from_efd_file_empty_file() -> MyResult<()> {
         let temp_dir = tempdir()?;
         let file_content = r"";
         let entry = create_dummy_direntry(&temp_dir, "PISCOFINS_EMPTY.txt", file_content)?;
 
-        let result = get_map(&entry)?;
+        let result = extract_keys_from_efd_file(&entry)?;
         assert!(result.is_empty());
         Ok(())
     }
 
     #[test]
-    fn test_get_map_with_different_encodings() -> MyResult<()> {
+    fn test_extract_keys_from_efd_file_with_different_encodings() -> MyResult<()> {
         // This test is harder to write purely with string literals for WINDOWS_1252
         // because rust string literals are UTF-8.
         // For a true test of get_string_utf8, you'd need to manually create a byte slice
@@ -532,7 +557,7 @@ mod lib_tests {
 |FIELD_ACCENT|áéíóúÁÉÍÓÚ|
         "; // This is UTF-8
         let entry = create_dummy_direntry(&temp_dir, "PISCOFINS_UTF8.txt", file_content_utf8)?;
-        let result = get_map(&entry)?;
+        let result = extract_keys_from_efd_file(&entry)?;
         assert!(result.contains("11111111111111111111111111111111111111111111"));
         Ok(())
     }
