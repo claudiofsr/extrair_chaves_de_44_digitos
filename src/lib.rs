@@ -191,6 +191,7 @@ fn process_line_for_keys(
             }
         }
     }
+
     Ok(Some(keys_on_line)) // Retorna as chaves encontradas nesta linha
 }
 
