@@ -1,0 +1,69 @@
+[package]
+name = "extrair_chaves_de_44_digitos"
+authors = ["Claudio F S Rodrigues <claudiofsrodrigues@gmail.com>"]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+description = "Extrair chaves de 44 dígitos de arquivos SPED EFD"
+license = "BSD-3-Clause"
+readme = "README.md"
+categories = ["command-line-utilities"]
+keywords = [
+    "SPED EFD",
+    "extract",
+    "regex",
+    "digits",
+]
+
+[dependencies]
+anstyle = "1.0" # used by clap color
+cc = { version = "1.2", features = ["parallel"] }
+encoding_rs = "0.8"
+encoding_rs_io = "0.1"
+rayon = "1.11"
+regex = "1.12"
+thiserror = "2.0"
+walkdir = "2.5"
+
+[dependencies.clap]
+version = "4.5"
+features = [
+    "color",
+    "derive",
+    "env",
+    "unstable-styles",
+]
+
+[dependencies.claudiofsr_lib]
+version = "0.16"
+# git = "https://github.com/claudiofsr/claudiofsr_lib"
+
+[dev-dependencies]
+# Dependencies ONLY needed for testing
+tempfile = "3.23"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+# Package release:
+# On Manjaro Linux, install with: pacman -S mingw-w64-gcc
+# rustup target list
+# After downloading the target with `rustup target add x86_64-pc-windows-gnu`
+# cargo b -r --target x86_64-unknown-linux-gnu --target x86_64-pc-windows-gnu
+
+[profile.release]
+# https://doc.rust-lang.org/cargo/reference/profiles.html
+debug = true            # Debug info at all.
+strip = "symbols"       # Strip symbols from a binary.
+opt-level = 3           # All optimizations.
+overflow-checks = true  # Panic will occur on overflow.
+lto = true              # Enable link time optimization.
+codegen-units = 1       # Use a single codegen for size optimization.
+panic = "abort"         # Remove traceback information.
+incremental = true      # Save information to disk, improving re-compile times.
+
+[profile.dev]
+opt-level = 1           # Use slightly better optimizations.
+
+# pacman -S aspell-en aspell-pt
+# "aspell --lang=en_US --check README.md"% 
